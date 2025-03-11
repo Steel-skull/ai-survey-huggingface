@@ -1,0 +1,297 @@
+/* Message color styles for the chat interface */
+
+.chat-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  overflow-y: visible !important; /* Ensure container expands with content */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+/* User message styling */
+.human-message .message-content {
+  background-color: var(--chakra-colors-brand-user, rgba(0, 120, 255, 0.2)) !important; /* Blue background with transparency */
+  border-color: var(--chakra-colors-brand-userBorder, rgb(0, 140, 255)) !important; /* Blue border */
+  color: rgb(120, 200, 255) !important; /* Brighter blue text */
+  word-break: break-word !important;
+  box-shadow: 0 0 8px rgba(0, 120, 255, 0.15) !important;
+  border-width: 2px !important;
+}
+
+/* Thoughts styling */
+.think-message .think-content {
+  font-size: 0.9em !important; /* Slightly larger font size */
+  line-height: 1.4 !important; /* Better line height */
+  max-width: 100% !important; /* Full width */
+  background-color: var(--chakra-colors-brand-think, rgba(255, 50, 50, 0.2)) !important; /* Red background with transparency */
+  border-color: var(--chakra-colors-brand-thinkBorder, rgb(255, 70, 70)) !important; /* Red border */
+  color: rgb(255, 120, 120) !important; /* Brighter red text */
+  padding: 12px !important; /* Normal padding */
+  display: block !important; /* Full block display */
+  word-break: break-word !important;
+  box-shadow: 0 0 8px rgba(255, 70, 70, 0.15) !important;
+  border-width: 2px !important;
+}
+
+/* Response styling */
+.post-think-message .post-think-content,
+.gpt-message .message-content {
+  background-color: var(--chakra-colors-brand-assistant, rgba(0, 200, 100, 0.2)) !important; /* Green background with transparency */
+  border-color: var(--chakra-colors-brand-assistantBorder, rgb(0, 220, 120)) !important; /* Green border */
+  color: rgb(120, 255, 170) !important; /* Brighter green text */
+  word-break: break-word !important;
+  box-shadow: 0 0 8px rgba(0, 200, 100, 0.15) !important;
+  border-width: 2px !important;
+}
+
+/* Make the thoughts container smaller */
+.think-message {
+  padding: 0 !important;
+  margin-left: 0 !important; /* No indent for full expansion */
+  max-width: 100% !important;
+}
+
+/* Ensure title text stands out */
+.message-content b, 
+.think-content b,
+.post-think-content b {
+  color: #ffffff !important;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Improve spacing and readability */
+.human-message,
+.gpt-message,
+.think-message,
+.post-think-message {
+  margin-bottom: 16px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Extra spacing after each message group */
+.human-message + .gpt-message,
+.gpt-message + .human-message,
+.think-message + .post-think-message {
+  margin-top: 24px !important;
+}
+
+.message-content,
+.think-content,
+.post-think-content {
+  padding: 16px !important;
+  border-radius: 6px !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Markdown specific styling */
+.markdown-content {
+  overflow-wrap: break-word;
+  width: 100% !important;
+  line-height: 1.6 !important;
+  font-size: 1.02em !important;
+}
+
+/* Make bold text stand out with white color across all messages */
+.markdown-content strong,
+.markdown-content b {
+  color: white !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Darken italicized text */
+.markdown-content em,
+.markdown-content i {
+  color: rgba(255, 255, 255, 0.75) !important;
+  font-style: italic !important;
+  opacity: 0.85 !important;
+}
+
+.markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  border-radius: 5px !important;
+  padding: 1.2em !important;
+  overflow-x: auto !important;
+  margin: 1em 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.markdown-content code {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  border-radius: 3px !important;
+  padding: 0.2em 0.4em !important;
+  font-family: 'Courier New', monospace !important;
+  font-size: 0.9em !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.markdown-content pre code {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3, 
+.markdown-content h4, 
+.markdown-content h5, 
+.markdown-content h6 {
+  margin-top: 1.5em !important;
+  margin-bottom: 0.75em !important;
+  font-weight: bold !important;
+  color: white !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding-bottom: 0.3em !important;
+}
+
+.markdown-content a {
+  color: #00e5ff !important;
+  text-decoration: underline !important;
+  transition: color 0.2s ease-in-out !important;
+}
+
+.markdown-content a:hover {
+  color: #66ffff !important;
+  text-decoration: underline !important;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.5) !important;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid rgba(255, 255, 255, 0.3) !important;
+  padding: 0.5em 0 0.5em 1em !important;
+  margin-left: 0 !important;
+  font-style: italic !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  margin: 1em 0 !important;
+}
+
+.markdown-content table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1em 0 !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.markdown-content th {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+  font-weight: bold !important;
+}
+
+.markdown-content th, 
+.markdown-content td {
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding: 10px !important;
+  text-align: left !important;
+}
+
+.markdown-content ul {
+  list-style-type: disc !important;
+  padding-left: 2em !important;
+  margin: 1em 0 !important;
+}
+
+.markdown-content ol {
+  list-style-type: decimal !important;
+  padding-left: 2em !important;
+  margin: 1em 0 !important;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5em !important;
+}
+
+.markdown-content li p {
+  margin: 0.5em 0 !important;
+}
+
+.markdown-content img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 4px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Horizontal rule */
+.markdown-content hr {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent) !important;
+  margin: 2em 0 !important;
+}
+
+/* User/Assistant/Thoughts styling with Markdown */
+.human-message .markdown-content {
+  color: rgb(120, 200, 255) !important; /* Brighter blue text for user messages */
+}
+
+.gpt-message .markdown-content {
+  color: rgb(120, 255, 170) !important; /* Brighter green text for assistant messages */
+}
+
+.think-message .markdown-content,
+.think-content .markdown-content {
+  color: rgb(255, 120, 120) !important; /* Brighter red text for thought messages */
+}
+
+.post-think-message .markdown-content,
+.post-think-content .markdown-content {
+  color: rgb(120, 255, 170) !important; /* Brighter green text for post-thought messages */
+}
+
+/* Add some special styling for code blocks in different message types */
+.human-message .markdown-content pre {
+  border-left: 4px solid rgb(0, 140, 255) !important;
+}
+
+.gpt-message .markdown-content pre {
+  border-left: 4px solid rgb(0, 220, 120) !important;
+}
+
+.think-message .markdown-content pre,
+.think-content .markdown-content pre {
+  border-left: 4px solid rgb(255, 70, 70) !important;
+}
+
+/* Fix for scrolling - ensure chat box expands fully and doesn't scroll within itself */
+.chat-box {
+  max-height: none !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+}
+
+/* Remove any fixed height constraints */
+.chat-container, 
+.human-message, 
+.gpt-message, 
+.think-message, 
+.post-think-message {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Use CSS variables from our theme */
+:root {
+  --user-message-bg: var(--chakra-colors-brand-user, rgba(0, 120, 255, 0.2));
+  --user-message-border: var(--chakra-colors-brand-userBorder, rgb(0, 140, 255));
+  --user-message-text: rgb(120, 200, 255);
+  
+  --think-message-bg: var(--chakra-colors-brand-think, rgba(255, 50, 50, 0.2));
+  --think-message-border: var(--chakra-colors-brand-thinkBorder, rgb(255, 70, 70));
+  --think-message-text: rgb(255, 120, 120);
+  
+  --assistant-message-bg: var(--chakra-colors-brand-assistant, rgba(0, 200, 100, 0.2));
+  --assistant-message-border: var(--chakra-colors-brand-assistantBorder, rgb(0, 220, 120));
+  --assistant-message-text: rgb(120, 255, 170);
+}

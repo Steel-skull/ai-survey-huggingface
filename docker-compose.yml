@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  survey-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # You can add GitHub-specific environment variables here if needed
+      - GIT_REPO=https://github.com/Steel-skull/ai-survey-huggingface.git
+      - GIT_BRANCH=master
+    volumes:
+      # Persist ratings data between container restarts
+      - ratings-data:/app/backend/data/ratings
+      - user-indices:/app/backend/data/user_indices
+    healthcheck:
+      test: ["CMD", "node", "/app/healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # Alternative service using pre-built image from GitHub
+  # Uncomment this section if you want to use GitHub Actions to build and publish an image
+  # survey-app-from-image:
+  #   image: ghcr.io/steel-skull/ai-survey-huggingface:latest
+  #   ports:
+  #     - "3002:3001"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3001
+  #   volumes:
+  #     - ratings-data-alt:/app/backend/data/ratings
+  #     - user-indices-alt:/app/backend/data/user_indices
+  #   restart: unless-stopped
+
+volumes:
+  ratings-data:
+  user-indices:
+  # ratings-data-alt:
+  # user-indices-alt:

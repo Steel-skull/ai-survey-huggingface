@@ -9,6 +9,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { HfInference } = require('@huggingface/hub');
+const fetch = require('node-fetch');
 
 // Try to load Parquet dependencies - make them optional
 let readParquet, tableFromIPC;
@@ -16,8 +17,16 @@ let parquetSupported = false;
 try {
   readParquet = require('parquet-wasm').readParquet;
   tableFromIPC = require('apache-arrow').tableFromIPC;
-  parquetSupported = true;
-  console.log('✅ Parquet support is enabled');
+  
+  // Verify functions are actually available and the correct type
+  if (typeof readParquet === 'function' && typeof tableFromIPC === 'function') {
+    parquetSupported = true;
+    console.log('✅ Parquet support is enabled');
+  } else {
+    console.log('⚠️ Parquet libraries loaded but functions not available');
+    console.log('readParquet type:', typeof readParquet);
+    console.log('tableFromIPC type:', typeof tableFromIPC);
+  }
 } catch (e) {
   console.error('Parquet libraries not available:', e.message);
   console.log('Only JSON format will be supported');
@@ -29,6 +38,7 @@ const SAFE_DATASET_NAME = DATASET_NAME.replace("/", "_");
 
 // HuggingFace configuration
 const HF_API_TOKEN = process.env.HF_API_TOKEN;
+const HF_DATASET_REPO = process.env.HF_DATASET_REPO || "Steelskull/pjmixers";
 
 // Directory setup
 const dataDir = path.join(__dirname, 'data');
@@ -71,11 +81,55 @@ async function ensureDirectories() {
 async function checkParquetSupport() {
   if (parquetSupported) {
     try {
-      // Create a small test Parquet file if possible
-      console.log('Parquet support: ✅ Available');
+      console.log('\n=== Testing Parquet Functionality ===');
+      
+      // Version details
+      const parquetVersion = require('parquet-wasm/package.json').version;
+      const arrowVersion = require('apache-arrow/package.json').version;
+      console.log(`parquet-wasm version: ${parquetVersion}`);
+      console.log(`apache-arrow version: ${arrowVersion}`);
+      
+      // Function validation
+      console.log('Function validation:');
+      console.log(`- readParquet is a function: ${typeof readParquet === 'function'}`);
+      console.log(`- tableFromIPC is a function: ${typeof tableFromIPC === 'function'}`);
+      
+      // Test with sample data if possible
+      try {
+        // Create a minimal sample Arrow table and convert to Parquet
+        console.log('\nAttempting to test with sample data...');
+        
+        // Attempt to fetch sample test data from HuggingFace if available
+        console.log(`Checking if we can fetch from HuggingFace...`);
+        try {
+          const testUrl = `https://huggingface.co/datasets/${HF_DATASET_REPO}/resolve/main/`;
+          console.log(`Testing fetch to: ${testUrl}`);
+          
+          const response = await fetch(testUrl, {
+            headers: HF_API_TOKEN ? { 
+              Authorization: `Bearer ${HF_API_TOKEN}`,
+              'User-Agent': 'AI-Survey-Check/1.0' 
+            } : {
+              'User-Agent': 'AI-Survey-Check/1.0'
+            },
+            timeout: 5000 // Short timeout for test
+          });
+          
+          console.log(`HuggingFace fetch test result: ${response.status} ${response.statusText}`);
+          console.log(`HuggingFace connection: ${response.ok ? '✅ Working' : '❌ Failed'}`);
+        } catch (fetchError) {
+          console.error('HuggingFace fetch test failed:', fetchError.message);
+          console.log('HuggingFace connection: ❌ Failed');
+        }
+      } catch (testError) {
+        console.log('Parquet sample test error:', testError.message);
+      }
+      
+      console.log('\nParquet support: ✅ Available');
       return true;
     } catch (error) {
       console.error('Parquet test failed:', error.message);
+      console.error('Error stack:', error.stack);
       return false;
     }
   } else {
@@ -111,6 +165,19 @@ async function checkDatasetLocations() {
 // Main function
 async function main() {
   console.log('=== AI Survey Dataset Check ===');
+  console.log('Node.js version:', process.version);
+  
+  // Check if fetch is available
+  try {
+    console.log('Testing node-fetch...');
+    const fetchVersion = require('node-fetch/package.json').version;
+    console.log(`node-fetch version: ${fetchVersion}`);
+    console.log('node-fetch: ✅ Available');
+  } catch (e) {
+    console.error('node-fetch error:', e.message);
+    console.log('node-fetch: ❌ Not available or not configured correctly');
+  }
+  
   console.log(`HuggingFace Dataset Repository: ${DATASET_NAME}`);
   console.log(`Authentication: ${HF_API_TOKEN ? 'Using API token' : 'No API token provided'}`);
   

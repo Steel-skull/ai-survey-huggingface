@@ -4,9 +4,16 @@ const morgan = require('morgan');
 const path = require('path');
 const fetch = require('node-fetch');
 const { HfInference } = require('@huggingface/hub');
+const https = require('https');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const crypto = require('crypto');
+
+// Create a custom agent for better https handling
+const agent = new https.Agent({
+  keepAlive: true,
+  timeout: 60000 // Longer timeout for large dataset downloads
+});
 
 // Try to load Parquet dependencies - make them optional
 let readParquet, tableFromIPC;
@@ -14,10 +21,21 @@ let parquetSupported = false;
 try {
   readParquet = require('parquet-wasm').readParquet;
   tableFromIPC = require('apache-arrow').tableFromIPC;
-  parquetSupported = true;
-  console.log('✅ Parquet support is enabled');
+  
+  // Do a simple test to verify parquet dependencies are working
+  if (typeof readParquet === 'function' && typeof tableFromIPC === 'function') {
+    parquetSupported = true;
+    console.log('✅ Parquet support is enabled');
+    console.log(`parquet-wasm version: ${require('parquet-wasm/package.json').version}`);
+    console.log(`apache-arrow version: ${require('apache-arrow/package.json').version}`);
+  } else {
+    console.log('⚠️ Parquet libraries loaded but functions not available');
+    console.log('readParquet type:', typeof readParquet);
+    console.log('tableFromIPC type:', typeof tableFromIPC);
+  }
 } catch (e) {
-  console.log('Parquet libraries not available. Only JSON format will be supported.');
+  console.error('Parquet libraries not available:', e.message);
+  console.log('⚠️ Only JSON format will be supported');
 }
 
 // HuggingFace configuration
@@ -41,21 +59,54 @@ let dataset = [];
 async function fetchDatasetFromHuggingFace() {
   try {
     console.log(`Attempting to fetch dataset from HuggingFace: ${HF_DATASET_REPO}`);
+    console.log(`Using node-fetch version: ${require('node-fetch/package.json').version}`);
+    
+    // Verify fetch is a function
+    if (typeof fetch !== 'function') {
+      console.error('Error: fetch is not a function');
+      console.log('fetch type:', typeof fetch);
+      return null;
+    }
     
     // Only try Parquet if the libraries are available
     if (parquetSupported) {
       // Try to fetch the dataset in Parquet format first
       console.log('Trying Parquet format...');
-      const parquetUrl = `https://huggingface.co/datasets/${HF_DATASET_REPO}/resolve/main/`;
-      let response = await fetch(parquetUrl, {
-        headers: HF_API_TOKEN ? { Authorization: `Bearer ${HF_API_TOKEN}` } : {}
-      });
+      const parquetUrl = `https://huggingface.co/datasets/${HF_DATASET_REPO}/resolve/main/data.parquet`;
+      console.log(`Attempting to fetch Parquet from: ${parquetUrl}`);
       
-      if (response.ok) {
-        console.log('✅ Found Parquet dataset, parsing...');
-        return await parseParquetDataset(response);
+      try {
+        const headers = HF_API_TOKEN ? { 
+          Authorization: `Bearer ${HF_API_TOKEN}`,
+          'User-Agent': 'AI-Survey-App/1.0'
+        } : {
+          'User-Agent': 'AI-Survey-App/1.0'
+        };
+
+        console.log('Request headers:', JSON.stringify(headers, null, 2));
+        
+        let response = await fetch(parquetUrl, {
+          agent,
+          headers,
+          timeout: 30000 // 30 second timeout
+        });
+      
+  
+        if (response.ok) {
+          console.log('✅ Found Parquet dataset, parsing...');
+          return await parseParquetDataset(response);
+        } else {
+          console.log(`⚠️ Parquet fetch failed with status: ${response.status} ${response.statusText}`);
+          // Log more details about the response
+          console.log('Response headers:', JSON.stringify(response.headers.raw(), null, 2));
+          const responseText = await response.text().catch(() => 'Could not read response text');
+          console.log('Response body preview:', responseText.substring(0, 200) + (responseText.length > 200 ? '...' : ''));
+        }
+      } catch (fetchError) {
+        console.error('Error during Parquet fetch:', fetchError);
+        console.log('Fetch error details:', fetchError.stack || 'No stack trace available');
       }
-      console.log('Parquet not found or error accessing it, trying JSON format...');
+      console.log('Parquet not found or error accessing it, falling back to JSON format...');
     }
     
     // If Parquet format isn't available, fall back to JSON
@@ -72,79 +123,142 @@ async function fetchDatasetFromHuggingFace() {
 
 async function fetchJsonDataset() {
   try {
-    // Stream dataset directly from HuggingFace dataset repository
-    const datasetUrl = `https://huggingface.co/datasets/${HF_DATASET_REPO}/resolve/main/`;
+    // Stream dataset from HuggingFace dataset repository
+    const datasetUrl = `https://huggingface.co/datasets/${HF_DATASET_REPO}/resolve/main/data.json`;
+    console.log(`Attempting to fetch JSON from: ${datasetUrl}`);
     
     // Fetch the dataset
-    const response = await fetch(datasetUrl, {
-      headers: HF_API_TOKEN ? { Authorization: `Bearer ${HF_API_TOKEN}` } : {}
-    });
+    try {
+      const headers = HF_API_TOKEN ? { 
+        Authorization: `Bearer ${HF_API_TOKEN}`,
+        'User-Agent': 'AI-Survey-App/1.0'
+      } : {
+        'User-Agent': 'AI-Survey-App/1.0'
+      };
+      
+      console.log('Request headers:', JSON.stringify(headers, null, 2));
+      
+      const response = await fetch(datasetUrl, {
+        agent,
+        headers,
+        timeout: 30000 // 30 second timeout
+      });
+  
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch dataset from HuggingFace: ${response.status} ${response.statusText}`);
+        console.error(`Failed to fetch dataset from HuggingFace: ${response.status} ${response.statusText}`);
+        console.log('Response headers:', JSON.stringify(response.headers.raw(), null, 2));
+        const responseText = await response.text().catch(() => 'Could not read response text');
+        console.log('Response body preview:', responseText.substring(0, 200) + (responseText.length > 200 ? '...' : ''));
+        throw new Error(`Failed to fetch dataset: ${response.status} ${response.statusText}`);
+     } 
+  
+        const jsonData = await response.json();
+      console.log(`✅ Successfully fetched dataset from HuggingFace with ${Array.isArray(jsonData) ? jsonData.length : 1} items`);
+    
+      // Process the dataset
+      let processedData;
+      if (Array.isArray(jsonData)) {
+        processedData = jsonData.map(processDatasetItem);
+      } else if (jsonData.conversations) {
+        processedData = [processDatasetItem(jsonData)];
+      } else {
+        throw new Error('Invalid dataset format from HuggingFace');
+      }
+    
+  
+      return processedData;
+    } catch (fetchError) {
+      console.error('Error during fetch operation:', fetchError);
+      if (fetchError.code === 'ENOTFOUND') {
+        console.error('Network error: Host not found. Check your internet connection.');
+      } else if (fetchError.type === 'request-timeout') {
+        console.error('Request timed out. The server took too long to respond.');
+      }
+      console.log('Fetch error stack:', fetchError.stack || 'No stack trace available');
+      throw fetchError;
     }
-    
-    const jsonData = await response.json();
-    console.log(`✅ Successfully fetched dataset from HuggingFace with ${Array.isArray(jsonData) ? jsonData.length : 1} items`);
-    
-    // Process the dataset
-    let processedData;
-    if (Array.isArray(jsonData)) {
-      processedData = jsonData.map(processDatasetItem);
-    } else if (jsonData.conversations) {
-      processedData = [processDatasetItem(jsonData)];
-    } else {
-      throw new Error('Invalid dataset format from HuggingFace');
-    }
-    
-    return processedData;
   } catch (error) {
     console.error('Error fetching JSON dataset from HuggingFace:', error.message);
+    console.log('Error type:', error.name);
+    console.log('Error stack:', error.stack || 'No stack trace available');
     return null;
   }
 }
 
 async function parseParquetDataset(response) {
   try {
-    // Double-check that Parquet is supported
     if (!parquetSupported || !readParquet || !tableFromIPC) {
       throw new Error('Parquet support is not available');
     }
     
-    // Get the binary data from the response
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    try {
+      // Get the binary data from the response
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
     
-    // Parse the Parquet data using parquet-wasm
-    const arrowTable = readParquet(buffer);
-    const table = tableFromIPC(arrowTable);
-    
-    // Convert Arrow table to JavaScript objects
-    const jsonData = [];
-    for (let i = 0; i < table.numRows; i++) {
-      const row = {};
-      for (const field of table.schema.fields) {
-        const column = table.getColumn(field.name);
-        row[field.name] = column.get(i);
+      console.log(`Received Parquet data: ${buffer.length} bytes`);
+      
+      if (buffer.length === 0) {
+        throw new Error('Received empty buffer from Parquet response');
       }
-      jsonData.push(row);
+      
+      // Parse the Parquet data using parquet-wasm
+      console.log('Parsing Parquet data with parquet-wasm...');
+      try {
+        const arrowTable = readParquet(buffer);
+        if (!arrowTable) {
+          throw new Error('Failed to read Parquet data - readParquet returned null/undefined');
+        }
+        
+        console.log('Converting to Arrow table...');
+        const table = tableFromIPC(arrowTable);
+        if (!table) {
+          throw new Error('Failed to convert Arrow table - tableFromIPC returned null/undefined');
+        }
+      
+        console.log(`Arrow table created with ${table.numRows} rows and ${table.schema.fields.length} columns`);
+        
+        // Convert Arrow table to JavaScript objects
+        const jsonData = [];
+        for (let i = 0; i < table.numRows; i++) {
+          const row = {};
+          for (const field of table.schema.fields) {
+            const column = table.getColumn(field.name);
+            row[field.name] = column.get(i);
+          }
+          jsonData.push(row);
+        }
+      
+    
+        console.log(`✅ Successfully parsed Parquet dataset with ${jsonData.length} items`);
+      
+    
+        // Process the dataset the same way as JSON
+        let processedData;
+        if (Array.isArray(jsonData)) {
+          processedData = jsonData.map(processDatasetItem);
+        } else if (jsonData.conversations) {
+          processedData = [processDatasetItem(jsonData)];
+        } else {
+          throw new Error('Invalid dataset format from Parquet file');
+        }
+      
+        return processedData;
+      } catch (parseError) {
+        console.error('Parquet parsing error:', parseError);
+        console.log('Error stack:', parseError.stack || 'No stack trace available');
+        throw parseError;
+      }
+    } catch (parsingError) {
+      console.error('Error during Parquet parsing:', parsingError);
+      console.log('Parquet parsing error details:', parsingError.stack || 'No stack trace available');
+      throw parsingError;
     }
-    
-    console.log(`✅ Successfully parsed Parquet dataset with ${jsonData.length} items`);
-    
-    // Process the dataset the same way as JSON
-    let processedData;
-    if (Array.isArray(jsonData)) {
-      processedData = jsonData.map(processDatasetItem);
-    } else if (jsonData.conversations) {
-      processedData = [processDatasetItem(jsonData)];
-    } else {
-      throw new Error('Invalid dataset format from Parquet file');
-    }
-    
-    return processedData;
   } catch (error) {
     console.error('Error parsing Parquet dataset:', error.message);
+    console.log('Error type:', error.name);
+    console.log('Error stack:', error.stack || 'No stack trace available');
     return null;
   }
 }
@@ -186,7 +300,7 @@ async function initializeApp() {
       console.log(`Dataset file(s) found in Docker container root directory`);
     }
     const jsonExists = rootJsonExists || dataFolderJsonExists || dockerRootJsonExists;
-    const parquetExists = rootParquetExists || dataFolderParquetExists;
+    const parquetExists = rootParquetExists || dataFolderParquetExists || dockerRootParquetExists;
     
     if (jsonExists || parquetExists) {
       const location = rootJsonExists || rootParquetExists ? 'root directory' : 'data folder';
@@ -219,15 +333,38 @@ async function initializeApp() {
       console.log('Falling back to local dataset');
       
       // Try parquet first if supported and available
-      if (parquetExists) {
+      if (parquetExists && parquetSupported) {
         console.log('Trying local Parquet dataset...');
         try {
-          const parquetData = await fs.readFile(localParquetPath);
+          const parquetPath = rootParquetExists ? rootParquetPath : 
+                            dataFolderParquetExists ? dataFolderParquetPath : 
+                            dockerRootParquetExists ? dockerRootParquetPath : null;
+                            
+          if (!parquetPath) {
+            throw new Error('No valid Parquet file path found');
+          }
+          
+          console.log(`Reading Parquet file from: ${parquetPath}`);
+          const parquetData = await fs.readFile(parquetPath);
+          console.log(`Read ${parquetData.length} bytes of Parquet data`);
+          
+          if (parquetData.length === 0) {
+            throw new Error('Parquet file is empty');
+          }
           
           // Only attempt to parse if the libraries are available
-          if (parquetSupported) {
+          if (parquetSupported && typeof readParquet === 'function' && typeof tableFromIPC === 'function') {
             const arrowTable = readParquet(parquetData);
+            if (!arrowTable) {
+              throw new Error('readParquet returned null/undefined');
+            }
+            
             const table = tableFromIPC(arrowTable);
+            if (!table) {
+              throw new Error('tableFromIPC returned null/undefined');
+            }
+            
+            console.log(`Parsed Parquet table with ${table.numRows} rows and ${table.schema.fields.length} columns`);
             
             // Convert Arrow table to JavaScript objects
             const jsonData = [];
@@ -255,6 +392,7 @@ async function initializeApp() {
           }
         } catch (parquetError) {
           console.error('Error loading local Parquet dataset:', parquetError.message);
+          console.log('Error stack:', parquetError.stack || 'No stack trace available');
           
           // Try JSON if it exists
           if (jsonExists) {
@@ -267,36 +405,20 @@ async function initializeApp() {
       } else if (jsonExists) {
         // Fall back to JSON dataset
         await loadLocalJsonDataset(localDataPath);
-      } else if (dockerRootJsonExists || dockerRootParquetExists) {
+      } else if (dockerRootJsonExists) {
         // Try Docker container root files
         console.log('Checking Docker container root for dataset files...');
-        
-        if (dockerRootParquetExists && parquetSupported) {
-          console.log('Trying Docker root Parquet dataset...');
-          try {
-            const parquetData = await fs.readFile(dockerRootParquetPath);
-            const arrowTable = readParquet(parquetData);
-            const table = tableFromIPC(arrowTable);
-            
-            // Process parquet data as before...
-            // ...
-            
-            console.log(`Loaded dataset from Docker container root Parquet file`);
-          } catch (parquetError) {
-            console.error('Error loading Docker root Parquet dataset:', parquetError.message);
-          }
-        } else if (dockerRootJsonExists) {
-          console.log('Loading Docker root JSON dataset...');
-          const dockerRootPath = dockerRootJsonExists ? dockerRootJsonPath : '';
-          await loadLocalJsonDataset(dockerRootPath);
-        }
+        console.log('Loading Docker root JSON dataset...');
+        await loadLocalJsonDataset(dockerRootJsonPath);
       } else {
         console.error('No dataset available from HuggingFace or locally');
         // Initialize with empty dataset
         dataset = [];
         
         // Create directory if it doesn't exist
-        await fs.mkdir(path.dirname(localDataPath), { recursive: true });
+        await fs.mkdir(path.dirname(localDataPath), { recursive: true }).catch(e => {
+          console.error(`Failed to create directory: ${e.message}`);
+        });
       }
     }
     
@@ -334,6 +456,7 @@ async function initializeApp() {
 async function loadLocalJsonDataset(localDataPath) {
   try {
     // Load data from local JSON file
+    console.log(`Reading local JSON dataset from: ${localDataPath}`);
     const data = await fs.readFile(localDataPath, 'utf8');
     let jsonData;
     

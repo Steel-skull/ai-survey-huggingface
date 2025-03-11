@@ -332,10 +332,21 @@ async function initializeApp() {
       // Fall back to local dataset
       console.log('Falling back to local dataset');
       
-      // Try parquet first if supported and available
-      if (parquetExists && parquetSupported) {
-        console.log('Trying local Parquet dataset...');
-        try {
+      // Try loading multiple JSON files from the dataset directory
+      console.log('Checking for multiple dataset files...');
+      const mergedDataset = await loadMergedDatasetFiles();
+      
+      if (mergedDataset && mergedDataset.length > 0) {
+        dataset = mergedDataset;
+        console.log(`Using merged dataset with ${dataset.length} items`);
+      } else {
+        console.log('No merged dataset available, checking for Parquet and single JSON files...');
+      
+        // Try parquet first if supported and available
+        if (parquetExists && parquetSupported) {
+
+          console.log('Trying local Parquet dataset...');
+          try {
           const parquetPath = rootParquetExists ? rootParquetPath : 
                             dataFolderParquetExists ? dataFolderParquetPath : 
                             dockerRootParquetExists ? dockerRootParquetPath : null;
@@ -421,6 +432,7 @@ async function initializeApp() {
         });
       }
     }
+    }
     
     if (dataset.length === 0) {
       console.warn('WARNING: Running with an empty dataset');
@@ -449,6 +461,77 @@ async function initializeApp() {
     console.log('App initialized successfully');
   } catch (error) {
     console.error('Error initializing app:', error);
+  }
+}
+
+// Function to merge multiple JSON files from a dataset directory
+async function loadMergedDatasetFiles() {
+  try {
+    const datasetDir = path.join(__dirname, 'data', 'dataset');
+    console.log(`Checking for dataset files in ${datasetDir}`);
+    
+    // Check if directory exists
+    const dirExists = await fs.access(datasetDir).then(() => true).catch(() => false);
+    if (!dirExists) {
+      console.log(`Dataset directory ${datasetDir} does not exist, creating it`);
+      await fs.mkdir(datasetDir, { recursive: true });
+      return null;
+    }
+    
+    // Get all JSON files in the dataset directory
+    const files = await fs.readdir(datasetDir);
+    const jsonFiles = files.filter(file => file.endsWith('.json'));
+    
+    if (jsonFiles.length === 0) {
+      console.log('No JSON files found in dataset directory');
+      return null;
+    }
+    
+    console.log(`Found ${jsonFiles.length} JSON files in dataset directory`);
+    
+    // Read and merge all JSON files
+    let mergedDataset = [];
+    
+    for (const file of jsonFiles) {
+      const filePath = path.join(datasetDir, file);
+      console.log(`Reading dataset file: ${filePath}`);
+      
+      try {
+        const data = await fs.readFile(filePath, 'utf8');
+        let jsonData;
+        
+        try {
+          jsonData = JSON.parse(data);
+          
+          // Handle different formats: array or single object
+          if (Array.isArray(jsonData)) {
+            console.log(`Adding ${jsonData.length} items from ${file}`);
+            mergedDataset = mergedDataset.concat(jsonData);
+          } else if (jsonData.conversations) {
+            console.log(`Adding single conversation item from ${file}`);
+            mergedDataset.push(jsonData);
+          } else {
+            console.log(`Skipping ${file} - unrecognized format`);
+          }
+        } catch (parseError) {
+          console.error(`Error parsing JSON in ${file}:`, parseError.message);
+        }
+      } catch (readError) {
+        console.error(`Error reading file ${file}:`, readError.message);
+      }
+    }
+    
+    if (mergedDataset.length > 0) {
+      console.log(`✅ Successfully merged ${mergedDataset.length} items from multiple JSON files`);
+      return mergedDataset.map(processDatasetItem);
+    } else {
+      console.log('No valid data found in JSON files');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error loading merged dataset files:', error.message);
+    console.log('Error stack:', error.stack || 'No stack trace available');
+    return null;
   }
 }
 
